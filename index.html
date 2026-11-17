@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Құрт қамалы</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0510;--red:#ff3864;--blu:#00f5ff;--grn:#39ff14;--gold:#ffd23f;--ink:#f1e6ff;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font-family:'JetBrains Mono','Courier New',monospace;font-weight:800;display:flex;justify-content:center;align-items:flex-start}
+#app{display:flex;flex-direction:column;align-items:center;width:100%}
+canvas{display:block;width:min(100vw,820px,calc((100dvh - 230px)*1.7778));aspect-ratio:800/450;background:#0a0510;border:2px solid var(--red);border-bottom:0;image-rendering:pixelated}
+#panel{width:min(100vw,820px);min-height:190px;padding:12px 14px 16px;background:#12060e;border:2px solid var(--red);box-shadow:0 0 22px #ff386455;display:flex;flex-direction:column;gap:10px}
+#qn{color:var(--blu);font-size:clamp(10px,1.6vw,12px)}
+#qq{margin:0;font-size:clamp(12px,2.1vw,16px);line-height:1.6}
+#opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:560px){#opts{grid-template-columns:1fr}}
+.opt{font:inherit;font-size:clamp(12px,1.9vw,15px);text-align:left;color:var(--ink);background:#1d0b2e;border:2px solid var(--blu);padding:11px 12px;cursor:pointer}
+.opt:hover:not(:disabled){background:#2d1348}
+.opt:disabled:not(.ok):not(.bad){opacity:.55;cursor:default}
+.opt.ok{background:var(--grn);color:#0a0510;border-color:var(--grn)}
+.opt.bad{background:#4a0f23;border-color:var(--red);color:#ff9bb0;text-decoration:line-through;cursor:default}
+.opt:focus-visible,.btn:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+#fb{margin:0;min-height:2.6em;font-size:clamp(11px,1.8vw,14px);line-height:1.5;color:var(--gold)}
+#fb.ok{color:var(--grn)}#fb.bad{color:var(--red)}
+.ov{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(10px,2.4vh,20px);padding:max(16px,env(safe-area-inset-top,0px)) 16px max(16px,env(safe-area-inset-bottom,0px));background:rgba(10,5,16,.9);text-align:center;overflow:auto}
+.ov[hidden]{display:none}
+h1{margin:0;line-height:1.4;font-size:clamp(22px,5.4vw,44px);color:var(--red);text-shadow:0 0 16px #ff3864aa}
+.ov p{margin:0;max-width:620px;font-size:clamp(11px,1.9vw,15px);line-height:1.8}
+.sub{color:var(--blu)}.hint{color:#c2a9e8}
+.btn{font:inherit;font-size:clamp(13px,2.2vw,18px);color:#0a0510;background:var(--red);border:0;padding:14px 28px;box-shadow:0 5px 0 #8a0f2c;cursor:pointer}
+.btn:active{transform:translateY(3px);box-shadow:0 2px 0 #8a0f2c}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="c" aria-label="Ойын алаңы"></canvas>
+  <div id="panel">
+    <div id="qn"></div>
+    <p id="qq"></p>
+    <div id="opts"></div>
+    <p id="fb"></p>
+  </div>
+</div>
+
+<div class="ov" id="menu">
+  <h1>ҚҰРТ ҚАМАЛЫ</h1>
+  <p class="sub">Информатика, 8-сынып</p>
+  <p>Қараңғы қамалда артыңнан алып құрт қуып келеді! Әр темір есік 8-сынып информатикасынан қойылған сұраққа дұрыс жауап бергенде ғана ашылады. Қате жауап берсең — құрт жақындайды. Уақыт таусылса — құрт сені жеп қояды!</p>
+  <p class="hint">Жауапты басу арқылы немесе 1–4 пернелерімен таңда</p>
+  <button class="btn" id="start">БАСТАУ</button>
+</div>
+
+<div class="ov" id="end" hidden>
+  <h1 id="et"></h1>
+  <p id="ex"></p>
+  <button class="btn" id="again"></button>
+</div>
+
+<script>
+'use strict';
+const VW=800,VH=450,FLOOR=372,HX=420,RUN=260,DOORSX=520,NL=8;
+const $=id=>document.getElementById(id);
+const cv=$('c'),g=cv.getContext('2d');
+cv.width=VW;cv.height=VH;g.imageSmoothingEnabled=false;
+const FONT=s=>'800 '+s+'px "JetBrains Mono","Courier New",monospace';
+
+/* ---------- Сұрақтар базасы (8-сынып информатикасы) ---------- */
+/* Бірінші нұсқа — дұрыс жауап; ойында нұсқалар араластырылады */
+const QS=[
+ {q:'Python тілінде экранға мәтін шығару үшін қандай команда қолданылады?',o:['print()','input()','int()','str()'],why:'print() — деректерді экранға шығаратын функция.'},
+ {q:'Электрондық кестелерде (Excel) формула қай таңбадан басталады?',o:['=','+','-','*'],why:'Формула әрқашан «=» таңбасынан басталады.'},
+ {q:'Логикалық «ЖӘНЕ» (AND) операциясының нәтижесі қашан шын (True) болады?',o:['Барлық шарт орындалғанда','Кез келген біреуі орындалғанда','Ешқашан','Жалған болғанда'],why:'AND барлық шарт шын болғанда ғана шын нәтиже береді.'},
+ {q:'HTML тілінде беттің тақырыбын (заголовок) көрсететін тег қандай?',o:['<h1>','<title>','<p>','<body>'],why:'<h1> — бет ішіндегі басты тақырып тегі.'},
+ {q:'1 байт неше бит болады?',o:['8','2','4','16'],why:'1 байт = 8 бит.'},
+ {q:'Python тілінде пайдаланушыдан мән енгізуге арналған функция қайсы?',o:['input()','print()','len()','abs()'],why:'input() пернетақтадан енгізілген мәтінді оқиды.'},
+ {q:'Алгоритмнің тармақталу құрылымында қандай оператор қолданылады?',o:['Шартты оператор (if)','Цикл операторы (for)','Шығару операторы (print)','Меншіктеу таңбасы (=)'],why:'Тармақталу шарттың шын немесе жалған болуына қарай әрекет таңдайды — if.'},
+ {q:'Excel-де A1 және A2 ұяшықтарының қосындысын табу формуласы қайсы?',o:['=A1+A2','A1+A2=','=A1*A2','A1:A2'],why:'Формула «=» таңбасынан басталады: =A1+A2.'},
+ {q:'Python тілінде 7 // 2 өрнегінің нәтижесі қандай?',o:['3','3.5','4','1'],why:'// — бүтін бөлу: 7-ні 2-ге бөлгенде бүтін бөлік 3 болады.'},
+ {q:'1 Кбайт неше байтқа тең?',o:['1024','1000','8','512'],why:'1 Кбайт = 1024 байт.'},
+ {q:'Python тізіміне (list) жаңа элемент қосатын әдіс қайсы?',o:['append()','print()','len()','sort()'],why:'append() элементті тізімнің соңына қосады.'},
+ {q:'Логикалық «НЕМЕСЕ» (OR) операциясының нәтижесі қашан жалған (False) болады?',o:['Екі шарт та жалған болғанда','Бір шарт шын болғанда','Екі шарт та шын болғанда','Ешқашан'],why:'OR барлық шарт жалған болғанда ғана жалған нәтиже береді.'},
+ {q:'HTML тілінде абзацты белгілейтін тег қандай?',o:['<p>','<img>','<a>','<h1>'],why:'<p> — мәтін абзацына арналған тег.'}
+];
+
+/* ---------- Күй ---------- */
+let st='menu',lv=0,gap=100,score=0,sx=0,open=0,t=0,pt=0,eatT=0,cur=null,order=[],shake=0,fade=0,flash=0,banner=0,qb=[];
+const rate=()=>2.4+0.3*lv;
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+/* ---------- Дыбыс (синтез) ---------- */
+let AC;
+function beep(f,d=.1,ty='square',v=.04){try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),gn=AC.createGain();o.type=ty;o.frequency.value=f;gn.gain.value=v;o.connect(gn);gn.connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}}
+
+/* ---------- Ойын барысы ---------- */
+function startGame(){
+  const rest=shuffle([4,5,6,7,8,9,10,11,12]).slice(0,NL-4);
+  order=shuffle([0,1,2,3].concat(rest));
+  lv=0;gap=100;score=0;sx=0;open=0;fade=0;eatT=0;banner=1.6;st='run';
+  $('menu').hidden=true;$('end').hidden=true;setRun();
+}
+function setRun(){
+  $('qn').textContent=(lv+1)+'-деңгей';
+  $('qq').textContent='Темір есікке қарай жүгіріп барасың… Құрт артыңнан қуып келеді!';
+  $('opts').innerHTML='';qb=[];$('fb').textContent='';$('fb').className='';
+}
+function showQ(){
+  const q=QS[order[lv]];
+  cur={q,opts:shuffle(q.o.map((x,i)=>({t:x,ok:i===0})))};
+  $('qn').textContent='Сұрақ '+(lv+1)+'/'+NL+' — есік құлыптаулы!';
+  $('qq').textContent=q.q;
+  $('fb').textContent='Тез жауап бер: құрт жақындап келеді!';$('fb').className='';
+  const box=$('opts');box.innerHTML='';qb=[];
+  cur.opts.forEach((o,i)=>{
+    const b=document.createElement('button');b.className='opt';b.textContent=(i+1)+'. '+o.t;
+    b.onclick=()=>pick(i);box.appendChild(b);qb.push(b);
+  });
+}
+function pick(i){
+  if(st!=='ask'||!qb[i]||qb[i].disabled)return;
+  const o=cur.opts[i],b=qb[i];
+  if(o.ok){
+    qb.forEach(x=>x.disabled=true);b.classList.add('ok');
+    score+=100+Math.round(gap);gap=Math.min(100,gap+35);
+    st='open';open=0;
+    $('fb').textContent='Дұрыс! Есік ашылды. '+cur.q.why;$('fb').className='ok';
+    beep(660,.12);setTimeout(()=>beep(880,.15),110);setTimeout(()=>beep(1320,.2),240);
+  }else{
+    b.disabled=true;b.classList.add('bad');
+    gap-=22;flash=.45;shake=.45;
+    $('fb').textContent='Қате! Құрт қатты жақындады!';$('fb').className='bad';
+    beep(110,.3,'sawtooth',.06);
+    if(gap<=0){gap=0;startEat()}
+  }
+}
+function startEat(){
+  st='eat';eatT=0;shake=.8;
+  qb.forEach(x=>x.disabled=true);
+  $('fb').textContent='Құрт сені қуып жетті!';$('fb').className='bad';
+  beep(80,.6,'sawtooth',.08);
+}
+function nextLevel(){
+  lv++;
+  if(lv>=NL){endGame(true);return}
+  sx=0;open=0;fade=1;banner=1.6;st='run';setRun();
+}
+function endGame(win){
+  st=win?'win':'over';
+  $('et').textContent=win?'ЖЕҢІС!':'ОЙЫН БІТТІ';
+  $('ex').textContent=win
+    ?'Сен барлық темір есікті ашып, құрттан құтылдың! Ұпай: '+score+'.'
+    :'Құрт сені жеп қойды… Ұпай: '+score+'. Жеткен деңгей: '+(lv+1)+'/'+NL+'.';
+  $('again').textContent=win?'ҚАЙТА ОЙНАУ':'ҚАЙТА БАСТАУ';
+  $('end').hidden=false;
+}
+$('start').onclick=()=>{beep(660,.1);startGame()};
+$('again').onclick=()=>{beep(660,.1);startGame()};
+addEventListener('keydown',e=>{
+  if(/^Digit[1-4]$/.test(e.code))pick(+e.code[5]-1);
+  if(e.code==='Enter'&&(st==='menu'||st==='over'||st==='win'))startGame();
+});
+
+function update(dt){
+  t+=dt;
+  if(shake>0)shake-=dt;if(flash>0)flash-=dt;if(banner>0)banner-=dt;
+  if(st==='run'){
+    if(fade>0)fade=Math.max(0,fade-dt*2);
+    sx=Math.min(DOORSX,sx+RUN*dt);gap-=rate()*.5*dt;
+    if(sx>=DOORSX&&gap>0){st='ask';showQ()}
+  }else if(st==='ask'){
+    gap-=rate()*dt;
+  }else if(st==='open'){
+    open=Math.min(1,open+dt/1.1);
+    if(open>=1){st='pass';pt=0}
+  }else if(st==='pass'){
+    sx+=RUN*dt;pt+=dt;
+    if(pt>1.5)fade=Math.min(1,(pt-1.5)/.5);
+    if(pt>2)nextLevel();
+  }else if(st==='eat'){
+    eatT+=dt;if(eatT>1.7)endGame(false);
+  }
+  if((st==='run'||st==='ask')&&gap<=0){gap=0;startEat()}
+}
+
+/* ---------- Графика ---------- */
+function spr(rows,pal,x,y,s){
+  rows.forEach((r,j)=>{for(let i=0;i<r.length;i++){
+    const c=r[i];if(c!=='.'){g.fillStyle=pal[c];g.fillRect(Math.round(x+i*s),Math.round(y+j*s),s,s)}
+  }});
+}
+const PP={h:'#9d4edd',v:'#00f5ff',b:'#5a189a',g:'#ffd23f',l:'#3c096c',f:'#39ff14'};
+const PBODY=['..hhhh..','.hhhhhh.','.hvvvvh.','.hvvvvh.','..bbbb..','.bbggbb.','.bbbbbb.'];
+const PLEG=[['..l..l..','..ff.ff.'],['.l...l..','.ff.ff..'],['..l...l.','..ff.ff.']];
+
+function drawHero(){
+  if(st==='eat'&&eatT>.35)return;
+  const running=(st==='run'||st==='pass');
+  const jit=(st==='ask'&&gap<30)||st==='eat'?Math.sin(t*60)*1.5:0;
+  const x=HX+jit,y=FLOOR-36-(running?Math.abs(Math.sin(t*12))*4:0);
+  const leg=running?[0,1,0,2][Math.floor(t*12)%4]:0;
+  spr(PBODY,PP,x,y,4);spr(PLEG[leg],PP,x,y+28,4);
+}
+
+function torch(x,y){
+  g.fillStyle='#3b2a1a';g.fillRect(x-4,y,8,30);
+  g.fillStyle='#6b4a2a';g.fillRect(x-9,y-4,18,8);
+  const f=Math.sin(t*13+x)*3+Math.sin(t*7+x*2)*2;
+  g.globalCompositeOperation='lighter';
+  const rg=g.createRadialGradient(x,y-14,4,x,y-14,150);
+  rg.addColorStop(0,'rgba(255,150,40,.34)');rg.addColorStop(1,'rgba(255,150,40,0)');
+  g.fillStyle=rg;g.fillRect(x-150,y-164,300,300);
+  g.globalCompositeOperation='source-over';
+  g.fillStyle='#ff7a1a';g.beginPath();g.moveTo(x-9,y-4);g.lineTo(x+f*.4,y-34-f);g.lineTo(x+9,y-4);g.fill();
+  g.fillStyle='#ffd23f';g.beginPath();g.moveTo(x-5,y-4);g.lineTo(x+f*.3,y-22-f*.6);g.lineTo(x+5,y-4);g.fill();
+}
+function arcWindow(x){
+  g.fillStyle='#16244a';g.strokeStyle='#33488a';g.lineWidth=3;
+  g.beginPath();g.moveTo(x,190);g.lineTo(x,92);g.arc(x+28,92,28,Math.PI,0);g.lineTo(x+56,190);g.closePath();g.fill();g.stroke();
+  g.beginPath();g.moveTo(x+28,64);g.lineTo(x+28,190);g.moveTo(x,130);g.lineTo(x+56,130);g.stroke();
+  g.fillStyle='rgba(120,150,255,.07)';
+  g.beginPath();g.moveTo(x,190);g.lineTo(x+56,190);g.lineTo(x+150,FLOOR);g.lineTo(x+40,FLOOR);g.closePath();g.fill();
+}
+function drawBG(){
+  const h=[270,220,160,25,350,300,190,330][lv%8];
+  const gr=g.createLinearGradient(0,0,0,FLOOR);
+  gr.addColorStop(0,'hsl('+h+',45%,7%)');gr.addColorStop(1,'hsl('+h+',35%,16%)');
+  g.fillStyle=gr;g.fillRect(0,0,VW,FLOOR);
+  const off=(sx*.5)%72;
+  g.strokeStyle='hsl('+h+',35%,10%)';g.lineWidth=2;g.beginPath();
+  for(let r=0;r*36<=FLOOR;r++){
+    g.moveTo(0,r*36);g.lineTo(VW,r*36);
+    for(let x=-72+(r%2?36:0)-off;x<VW;x+=72){g.moveTo(x,r*36);g.lineTo(x,r*36+36)}
+  }
+  g.stroke();
+  const b1=-((sx*.5)%330);
+  for(let k=-1;k<4;k++)arcWindow(b1+k*330+120);
+  const b2=-((sx*.8)%260);
+  for(let k=-1;k<5;k++)torch(b2+k*260+60,200);
+  g.fillStyle='hsl('+h+',25%,8%)';g.fillRect(0,FLOOR,VW,VH-FLOOR);
+  g.fillStyle='hsl('+h+',70%,45%)';g.fillRect(0,FLOOR,VW,3);
+  g.strokeStyle='hsl('+h+',30%,16%)';g.lineWidth=2;g.beginPath();
+  g.moveTo(0,FLOOR+36);g.lineTo(VW,FLOOR+36);
+  for(let x=-(sx%80);x<VW;x+=80){g.moveTo(x,FLOOR);g.lineTo(x-14,VH)}
+  g.stroke();
+}
+function drawDoor(dx){
+  const w=150,h=250,top=FLOOR-h;
+  const pulse=.6+.4*Math.sin(t*5);
+  g.fillStyle='#3a3f58';g.fillRect(dx-20,top-20,w+40,h+20);
+  g.fillStyle='#2a2e44';
+  for(let i=0;i<6;i++)g.fillRect(dx-20,top-20+i*42,10,3),g.fillRect(dx+w+10,top-20+i*42,10,3);
+  const lg=g.createLinearGradient(0,top,0,FLOOR);lg.addColorStop(0,'#fff1b0');lg.addColorStop(1,'#ff9a2e');
+  g.fillStyle=lg;g.fillRect(dx,top,w,h);
+  g.save();g.beginPath();g.rect(dx,top,w,h);g.clip();
+  const oy=-open*(h+8);
+  g.fillStyle='#262a3c';g.fillRect(dx,top+oy,w,h);
+  g.fillStyle='#161826';
+  for(let i=1;i<6;i++)g.fillRect(dx+i*25,top+oy,3,h);
+  g.fillRect(dx,top+oy+50,w,10);g.fillRect(dx,top+oy+h-70,w,10);
+  g.fillStyle='#6d748f';
+  for(let i=0;i<6;i++){g.fillRect(dx+8+i*25,top+oy+53,5,5);g.fillRect(dx+8+i*25,top+oy+h-67,5,5)}
+  g.fillStyle='#161826';
+  for(let i=0;i<6;i++){g.beginPath();g.moveTo(dx+i*25,top+oy+h);g.lineTo(dx+i*25+12,top+oy+h-16);g.lineTo(dx+i*25+25,top+oy+h);g.fill()}
+  if(open<1){
+    g.shadowColor='#ff3864';g.shadowBlur=18*pulse;
+    g.fillStyle=open>0?'#39ff14':'#ff3864';
+    g.beginPath();g.arc(dx+w/2,top+oy+h/2,22,0,7);g.fill();g.shadowBlur=0;
+    g.fillStyle='#0a0510';g.font=FONT(26);g.textAlign='center';g.fillText(open>0?'✓':'?',dx+w/2,top+oy+h/2+9);
+  }
+  g.restore();
+  if(open<=0){g.strokeStyle='rgba(255,56,100,'+(.4+.5*pulse)+')';g.lineWidth=3;g.strokeRect(dx-20,top-20,w+40,h+20)}
+}
+
+function drawWorm(hx){
+  const n=18,jaw=(gap<35||st==='eat')?1:.3+.2*Math.sin(t*5);
+  for(let i=n;i>=1;i--){
+    const x=Math.round(hx+10-i*30),s=Math.round(58-i*.6),y=Math.round(FLOOR-s-4+Math.sin(t*4-i*.7)*9);
+    g.fillStyle=i%2?'#7a1230':'#951a3b';g.fillRect(x,y,s,s);
+    g.fillStyle='#d63a63';g.fillRect(x+4,y+s-10,s-8,6);
+    g.fillStyle='#4a0a1c';g.fillRect(x,y+s-4,s,4);g.fillRect(x+s-5,y,5,s);
+    g.fillStyle='#ff3864';g.beginPath();g.moveTo(x+8,y);g.lineTo(x+s/2,y-14);g.lineTo(x+s-8,y);g.fill();
+  }
+  const y0=Math.round(FLOOR-92+Math.sin(t*4)*4),x=Math.round(hx);
+  g.fillStyle='#e9dcff';
+  g.beginPath();g.moveTo(x+12,y0);g.lineTo(x+22,y0-22);g.lineTo(x+34,y0);g.fill();
+  g.beginPath();g.moveTo(x+50,y0);g.lineTo(x+62,y0-22);g.lineTo(x+74,y0);g.fill();
+  g.fillStyle='#b01f48';g.fillRect(x,y0,88,54);
+  g.fillStyle='#d63a63';g.fillRect(x+4,y0+4,80,6);
+  g.fillStyle='#7a1230';g.fillRect(x,y0+46,88,8);
+  g.shadowColor='#ffd23f';g.shadowBlur=14;g.fillStyle='#ffd23f';g.fillRect(x+54,y0+14,24,20);g.shadowBlur=0;
+  g.fillStyle='#0a0510';g.fillRect(x+66,y0+16,8,16);
+  g.fillStyle='#4a0a1c';g.beginPath();g.moveTo(x+46,y0+8);g.lineTo(x+82,y0+16);g.lineTo(x+82,y0+10);g.lineTo(x+46,y0+2);g.fill();
+  const jy=y0+54,jh=Math.round(8+jaw*18);
+  g.fillStyle='#1a0008';g.fillRect(x+4,jy,84,jh);
+  g.fillStyle='#7a1230';g.fillRect(x,jy+jh,88,26);
+  g.fillStyle='#ffffff';
+  for(let k=0;k<6;k++){
+    g.beginPath();g.moveTo(x+8+k*13,jy);g.lineTo(x+14+k*13,jy+12);g.lineTo(x+20+k*13,jy);g.fill();
+    g.beginPath();g.moveTo(x+8+k*13,jy+jh);g.lineTo(x+14+k*13,jy+jh-12);g.lineTo(x+20+k*13,jy+jh);g.fill();
+  }
+  g.fillStyle='rgba(124,255,107,.7)';
+  g.fillRect(x+30,jy+jh+20,4,10+Math.sin(t*6)*6);g.fillRect(x+62,jy+jh+20,4,8+Math.cos(t*5)*5);
+}
+
+function drawHUD(){
+  g.fillStyle='rgba(0,0,0,.62)';g.fillRect(0,0,VW,54);
+  g.textBaseline='alphabetic';
+  g.font=FONT(15);g.textAlign='left';g.fillStyle='#00f5ff';g.fillText('Деңгей: '+Math.min(lv+1,NL)+'/'+NL,12,20);
+  g.textAlign='right';g.fillStyle='#ffd23f';g.fillText('Ұпай: '+score,VW-12,20);
+  g.font=FONT(11);g.textAlign='left';g.fillStyle='#ff9bb0';g.fillText('Құрт қашықтығы',12,44);
+  const bx=150,bw=VW-150-92,p=Math.max(0,gap)/100;
+  g.fillStyle='#2b0a14';g.fillRect(bx,32,bw,14);
+  const col=gap>50?'#39ff14':gap>25?'#ffd23f':(Math.floor(t*6)%2?'#ff3864':'#a01a42');
+  g.fillStyle=col;g.fillRect(bx,32,bw*p,14);
+  g.strokeStyle='rgba(241,230,255,.4)';g.lineWidth=2;g.strokeRect(bx,32,bw,14);
+  g.textAlign='right';g.fillStyle=col;g.font=FONT(13);
+  g.fillText('≈ '+Math.ceil(Math.max(0,gap)/rate())+' с',VW-12,44);
+  if(banner>0){
+    const a=Math.min(1,banner);
+    g.globalAlpha=a;g.fillStyle='rgba(10,5,16,.75)';g.fillRect(0,150,VW,90);
+    g.textAlign='center';g.fillStyle='#00f5ff';g.font=FONT(30);g.fillText((lv+1)+'-ДЕҢГЕЙ',VW/2,192);
+    g.fillStyle='#ff9bb0';g.font=FONT(15);g.fillText('Есікке жүгір, құрт артыңда!',VW/2,222);
+    g.globalAlpha=1;
+  }
+}
+
+function draw(){
+  g.save();
+  if(shake>0||(st==='ask'&&gap<20))g.translate((Math.random()-.5)*6,(Math.random()-.5)*6);
+  drawBG();
+  drawDoor(HX+80+DOORSX-sx);
+  let wx=HX-86-gap*3+Math.sin(t*3)*4;
+  if(st==='eat')wx=HX-86+Math.min(eatT/.35,1)*46;
+  drawWorm(wx);
+  drawHero();
+  g.restore();
+  const vg=g.createRadialGradient(VW/2,VH/2,180,VW/2,VH/2,520);
+  vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.72)');
+  g.fillStyle=vg;g.fillRect(0,0,VW,VH);
+  const d=Math.pow(1-Math.max(0,gap)/100,2)*.6;
+  const rg=g.createLinearGradient(0,0,380,0);
+  rg.addColorStop(0,'rgba(255,30,60,'+d+')');rg.addColorStop(1,'rgba(255,30,60,0)');
+  g.fillStyle=rg;g.fillRect(0,0,VW,VH);
+  if(flash>0){g.fillStyle='rgba(255,40,70,'+Math.min(.5,flash)+')';g.fillRect(0,0,VW,VH)}
+  drawHUD();
+  if(fade>0){g.fillStyle='rgba(0,0,0,'+fade+')';g.fillRect(0,0,VW,VH)}
+  if(st==='eat'&&eatT>.35){g.fillStyle='rgba(120,0,20,'+Math.min(.55,(eatT-.35)*.6)+')';g.fillRect(0,0,VW,VH)}
+}
+
+/* ---------- Негізгі цикл ---------- */
+let last=0;
+function loop(ts){
+  const dt=Math.min(.05,(ts-last)/1000||0);last=ts;
+  if(st==='menu'||st==='over'||st==='win')t+=dt;else update(dt);
+  draw();requestAnimationFrame(loop);
+}
+$('qn').textContent='Құрт қамалы';
+$('qq').textContent='«Бастау» түймесін бас та, есікке қарай жүгір!';
+requestAnimationFrame(ts=>{last=ts;loop(ts)});
+</script>
+</body>
+</html>
